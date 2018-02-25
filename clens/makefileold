@@ -1,0 +1,30 @@
+
+CC=gcc -std=c99 
+
+FFTINC = -I/usr/local/include
+FFTLIB = -L/usr/local/bin
+
+CFLAGS = -O3
+LIBS = -lm -lfftw3 -lgsl -lgslcblas
+OPT = $(FFTINC) $(FFTLIB)
+
+iLens: main.o convolution.o interface_aq.o icosmo.o tech.o
+	$(CC) -o iLens $(CFLAGS) main.o convolution.o interface_aq.o icosmo.o tech.o $(LIBS) $(OPT)
+
+main: main.h
+	$(CC) -o main.o $(CFLAGS) -c main.c
+    
+convolution: convolution.h
+	$(CC) -o convolution.o $(CFLAGS) $(OPT) -c convolution.c 
+tech: tech.h
+	$(CC) -o tech.o $(CFLAGS) $(OPT) -c tech.c
+
+interface: interface.h icosmo.h tech.h
+	$(CC) -o interface_aq.o $(CFLAGS) -c interface_aq.c 
+icosmo: icosmo.h
+	$(CC) -o icosmo.o $(CFLAGS) -c icosmo.c	
+.PHONY: clean
+
+clean:
+	rm -f *.o iLens
+
