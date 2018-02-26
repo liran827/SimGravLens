@@ -54,7 +54,7 @@ nu_0=0.03 #ADU/s/pixel
 sec2rad=1./180.*np.pi/3600.
 
 #simulation configuration
-lens_scale=13
+lens_scale=2
 
 OUTPUT=True
 ADD_FOREGROUND=True
@@ -133,13 +133,13 @@ for i in [35]:
     sigma2d=(sigma_crit/1e4) *np.sqrt(q)/2.*bsie/np.sqrt(np.power(xp,2.)+np.power(yp*q,2.))
 
     #calculate deflection angle
-    #dpdx1,dpdy1= DFL_angle(sigma2d, z_lens, z_source, nnn,lensSize)
+    #dpdx_m,dpdy_m= DFL_angle(sigma2d, z_lens, z_source, nnn,lensSize)
 
 
     lpar_sie=bsie,xi,yi,pa*180./np.pi,q,0.
     dpdx_sie,dpdy_sie,dpdx_sie2,dpdx_sie2=def_sie(xmesh.reshape(-1,order='C'),ymesh.reshape(-1,order='C'),lpar_sie) #arcsec
-    dpdx1=-dpdy_sie/(180./np.pi*3600.) #rad
-    dpdy1=-dpdx_sie/(180./np.pi*3600.)
+    dpdx_m=-dpdy_sie/(180./np.pi*3600.) #rad
+    dpdy_m=-dpdx_sie/(180./np.pi*3600.)
     print "Using analytical SIE model for main lens"
 
     #set a subhalo mesh
@@ -164,48 +164,94 @@ for i in [35]:
 
     #plt.figure()
     #xx=(np.arange(nnn)-(nnn/2.-0.5) )*dpix_image
-    #plt.plot(xx,180./np.pi*3600.*dpdy1.reshape(nnn,nnn)[nnn/2+10,:])
+    #plt.plot(xx,180./np.pi*3600.*dpdy_m.reshape(nnn,nnn)[nnn/2+10,:])
     #plt.plot(xx,-dpdx_sie.reshape(nnn,nnn)[nnn/2+10,:])
     #plt.xlim(xmax=5,xmin=-5)
-    #diff=180./np.pi*3600.*dpdy1.reshape(nnn,nnn)[nnn/2+10,:]+dpdx_sie.reshape(nnn,nnn)[nnn/2+10,:]
+    #diff=180./np.pi*3600.*dpdy_m.reshape(nnn,nnn)[nnn/2+10,:]+dpdx_sie.reshape(nnn,nnn)[nnn/2+10,:]
     #ind=np.where((xx<5)*(xx>-5))
     #diff=diff[ind]
     #plt.figure()
     #plt.plot(xx[ind],diff)
-    #plt.plot(xx,dpdy1.reshape(nnn,nnn)[nnn/2,:]*180./np.pi*3600.+dpdx_sie.reshape(nnn,nnn)[nnn/2,:],'--')
+    #plt.plot(xx,dpdy_m.reshape(nnn,nnn)[nnn/2,:]*180./np.pi*3600.+dpdx_sie.reshape(nnn,nnn)[nnn/2,:],'--')
 
     #print
     #print "warning: already using analytical sie model"
     #print
-    #dpdx1=-dpdy_sie/(180./np.pi*3600.) #rad
-    #dpdy1=-dpdx_sie/(180./np.pi*3600.)
+    #dpdx_m=-dpdy_sie/(180./np.pi*3600.) #rad
+    #dpdy_m=-dpdx_sie/(180./np.pi*3600.)
 
 
 #==================================
 #add deflection angle of two planes
 #==================================
 
-    if(z_sub<z_lens):
+
+
+    if(z_sub<z_lens): #z1>z2
         Dfact=cosmo.Da(z_sub,z_lens)/cosmo.Da(0,z_lens)
-        xmesh_dev,ymesh_dev=xmesh-Dfact*dpdx_s.reshape(nnn,nnn)*(180./np.pi*3600.),ymesh-Dfact*dpdy_s.reshape(nnn,nnn)*(180./np.pi*3600.)
+        dpdx_1=dpdx_m
+        dpdy_1=dpdy_m
 
-        nx_dev_temp=np.round( xmesh[nnn/2-200:nnn/2+200,nnn/2-200:nnn/2+200]/dpix_image + (nnn/2 - 0.5) )
-        ny_dev_temp=np.round( ymesh[nnn/2-200:nnn/2+200,nnn/2-200:nnn/2+200]/dpix_image + (nnn/2 - 0.5) )
+        dpdx_2=dpdx_s
+        dpdy_2=dpdy_s
 
-        dpdx1_dev=dpdx1
-        dpdy1_dev=dpdy1
-
-        #only change the central
-        dpdx1_dev.reshape(nnn,nnn)[nnn/2-200:nnn/2+200,nnn/2-200:nnn/2+200]=dpdx1.reshape(nnn,nnn)[ny_dev_temp.astype("int32"),nx_dev_temp.astype("int32")]
-        dpdy1_dev.reshape(nnn,nnn)[nnn/2-200:nnn/2+200,nnn/2-200:nnn/2+200]=dpdy1.reshape(nnn,nnn)[ny_dev_temp.astype("int32"),nx_dev_temp.astype("int32")]
-
-        dpdx_a=dpdx1_dev+dpdx_s
-        dpdy_a=dpdy1_dev+dpdy_s
-
-
+        dpdx_a=dpdx_1+dpdx_2
+        dpdy_a=dpdy_1+dpdy_2
     else:
-        print "only coding z_sub<z_lens case!!"
-        sys.exit()
+        Dfact=cosmo.Da(z_lens,z_sub)/cosmo.Da(0.,zsub)
+
+        dpdx_2=dpdx_m
+        dpdy_2=dpdy_m
+
+        dpdx_1=dpdx_s
+        dpdy_1=dpdy_s
+
+        #position of x,y in Plane z1
+        x_dev,y_dev=xmesh-Dfact*dpdx_2.reshape(nnn,nnn)*(180./np.pi*3600.),ymesh-Dfact*dpdy_2.reshape(nnn,nnn)*(180./np.pi*3600.)
+
+        x_dev=x_dev.reshape(-1)
+        y_dev=y_dev.reshape(-1)
+
+        #find which cell do each ray belong
+        nx_dev=(x_dev/dpix_image + (nnn/2 - 0.5)).astype("int")
+        ny_dev=(y_dev/dpix_image + (nnn/2 - 0.5)).astype("int")
+
+        ind1,=np.where( (nx_dev<xmesh.shape[0]-1)*(ny_dev < xmesh.shape[0]-1) )
+
+        #bilinear intepolate to get the deflection angle alpha_1 at x_dev,y_dev
+        fx_11=np.zeros_like(x_dev)
+        fx_12=np.zeros_like(x_dev)
+        fx_21=np.zeros_like(x_dev)
+        fx_22=np.zeros_like(x_dev)
+
+        fy_11=np.zeros_like(x_dev)
+        fy_12=np.zeros_like(x_dev)
+        fy_21=np.zeros_like(x_dev)
+        fy_22=np.zeros_like(x_dev)
+
+        fx_11[ind1] = dpdx_1[ ny_dev[ind1]*nnn + nx_dev[ind1] ]
+        fx_12[ind1] = dpdx_1[ ny_dev[ind1]*nnn + nx_dev[ind1] + 1]
+        fx_21[ind1] = dpdx_1[ (ny_dev[ind1] + 1)*nnn + nx_dev[ind1] ]
+        fx_22[ind1] = dpdx_1[ (ny_dev[ind1] + 1)*nnn + nx_dev[ind1] + 1 ]
+
+        fy_11[ind1]= dpdy_1[ ny_dev[ind1]*nnn + nx_dev[ind1] ]
+        fy_12[ind1] = dpdy_1[ ny_dev[ind1]*nnn + nx_dev[ind1] + 1 ]
+        fy_21[ind1] = dpdy_1[ (ny_dev[ind1] + 1)*nnn + nx_dev[ind1] ]
+        fy_22[ind1] = dpdy_1[ (ny_dev[ind1] + 1)*nnn + nx_dev[ind1] + 1 ]
+
+        x1=(nx_dev-(nnn/2 - 0.5) ) *dpix_image
+        x2=((nx_dev+1)- (nnn/2 - 0.5))*dpix_image
+        y1=(ny_dev-(nnn/2 - 0.5) ) *dpix_image
+        y2=((ny_dev+1)- (nnn/2 - 0.5))*dpix_image
+
+        dpdx_1_intp= 1./dpix_image/dpix_image * ( fx_11*(x_dev - x1)*(y_dev - y1) + fx_12*(y_dev-y1)*(x2-x_dev) + fx_21*(y2-y_dev)*(x_dev-x1) + fx_22*(y2-y_dev)*(x2-x_dev) )
+        dpdy_1_intp= 1./dpix_image/dpix_image * ( fy_11*(x_dev - x1)*(y_dev - y1) + fy_12*(y_dev-y1)*(x2-x_dev) + fy_21*(y2-y_dev)*(x_dev-x1) + fy_22*(y2-y_dev)*(x2-x_dev) )
+
+        dpdx_a=dpdx_1_intp + dpdx_2
+        dpdy_a=dpdy_1_intp + dpdy_2
+    #sys.exit()
+
+
 
 
 
@@ -250,7 +296,7 @@ for i in [35]:
     image2d_b=np.zeros(NX*NY)
 
     # image with no sub, green function
-    mapping_source_pix(dpdx1.ctypes.data_as(POINTER(c_double)), dpdy1.ctypes.data_as(POINTER(c_double)), \
+    mapping_source_pix(dpdx_m.ctypes.data_as(POINTER(c_double)), dpdy_m.ctypes.data_as(POINTER(c_double)), \
     c_int(x_start), c_int(x_end), c_int(y_start), c_int(y_end), c_double(lensSize), c_int(nnn),\
     c_double(SourceSize),c_int(nnn_source), source2d.ctypes.data_as(POINTER(c_double)),image2d.ctypes.data_as(POINTER(c_double)))
     #image with sub
@@ -381,8 +427,8 @@ for i in [35]:
 
         hdu1=pyfits.ImageHDU(img_c2_ob) #with sub
         hdu2=pyfits.ImageHDU(img_c_ob)  # with nosub
-        #hdu3=pyfits.ImageHDU(dpdx1.reshape(nnn,nnn))
-        #hdu4=pyfits.ImageHDU(dpdy1.reshape(nnn,nnn))
+        #hdu3=pyfits.ImageHDU(dpdx_m.reshape(nnn,nnn))
+        #hdu4=pyfits.ImageHDU(dpdy_m.reshape(nnn,nnn))
         hdu3=pyfits.ImageHDU(noise_map)
         hdu4=pyfits.ImageHDU(noise_map2)
         #hdu5=pyfits.ImageHDU(PSF_new)
