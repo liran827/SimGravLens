@@ -1,7 +1,6 @@
 #resimulate analytical model
 import numpy as np
 import matplotlib.pyplot as plt
-from mock_lib import *
 import cosmo
 cosmo.set_para(h0=100.) #set H0=100
 import lensinglib as ll

@@ -327,11 +327,11 @@ for i in [35]:
     #PLOTTING
     #==============================
     plt.figure()
-    plt.imshow(np.log10(I_phot),origin='lower')
+    plt.imshow(I_phot,origin='lower')
     plt.colorbar()
 
     plt.figure()
-    plt.imshow(np.log10(I_source),origin='lower')
+    plt.imshow(I_source,origin='lower')
     plt.colorbar()
 
 
